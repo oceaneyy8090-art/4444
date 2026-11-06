@@ -1,0 +1,651 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#000000">
+<title>Pink Phantom</title>
+
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+}
+
+body {
+  position: fixed;
+  inset: 0;
+}
+
+canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+</style>
+</head>
+
+<body>
+<canvas id="scene"></canvas>
+
+<script>
+const canvas = document.getElementById("scene");
+const ctx = canvas.getContext("2d");
+
+let W, H, DPR;
+let time = 0;
+
+const DESIGN_W = 600;
+const DESIGN_H = 900;
+
+const pink = "#ff42b9";
+const lightPink = "#ff9cdd";
+const white = "#fff0fb";
+const deepPink = "#c90078";
+
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+  W = window.innerWidth;
+  H = window.innerHeight;
+
+  canvas.width = W * DPR;
+  canvas.height = H * DPR;
+}
+
+window.addEventListener("resize", resize);
+resize();
+
+// Deterministic random
+function random(n) {
+  const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+// Glowing paths
+function line(points, color, width = 1, blur = 12, alpha = 1) {
+  ctx.save();
+
+  ctx.beginPath();
+  ctx.moveTo(points[0][0], points[0][1]);
+
+  for (let i = 1; i < points.length - 1; i++) {
+    const p = points[i];
+    const next = points[i + 1];
+
+    const mx = (p[0] + next[0]) / 2;
+    const my = (p[1] + next[1]) / 2;
+
+    ctx.quadraticCurveTo(p[0], p[1], mx, my);
+  }
+
+  const last = points[points.length - 1];
+  ctx.lineTo(last[0], last[1]);
+
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  ctx.shadowColor = color;
+  ctx.shadowBlur = blur;
+
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function bezier(points, color, width = 1, blur = 12, alpha = 1) {
+  ctx.save();
+
+  ctx.beginPath();
+  ctx.moveTo(points[0], points[1]);
+
+  for (let i = 2; i < points.length; i += 6) {
+    ctx.bezierCurveTo(
+      points[i],
+      points[i + 1],
+      points[i + 2],
+      points[i + 3],
+      points[i + 4],
+      points[i + 5]
+    );
+  }
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.lineCap = "round";
+  ctx.globalAlpha = alpha;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = blur;
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+// Background aura
+function background() {
+  const g = ctx.createRadialGradient(
+    330, 380, 10,
+    330, 380, 520
+  );
+
+  g.addColorStop(0, "rgba(255,0,130,.12)");
+  g.addColorStop(.35, "rgba(170,0,100,.07)");
+  g.addColorStop(.75, "rgba(70,0,50,.025)");
+  g.addColorStop(1, "rgba(0,0,0,0)");
+
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, DESIGN_W, DESIGN_H);
+
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, DESIGN_W, DESIGN_H);
+}
+
+// Floating tiny particles
+const particles = Array.from({length: 150}, (_, i) => ({
+  x: random(i + 1) * DESIGN_W,
+  y: random(i + 300) * DESIGN_H,
+  size: .4 + random(i + 500) * 1.4,
+  speed: .2 + random(i + 700) * .7,
+  phase: random(i + 900) * 6.28
+}));
+
+function drawParticles() {
+  particles.forEach((p, i) => {
+    const x = p.x + Math.sin(time * .3 + p.phase) * 9;
+    const y = (p.y - time * p.speed * 8 + 1000) % DESIGN_H;
+
+    const opacity = .3 + .7 *
+      Math.abs(Math.sin(time * .7 + p.phase));
+
+    ctx.save();
+
+    ctx.globalAlpha = opacity;
+    ctx.fillStyle = i % 4 === 0 ? white : lightPink;
+    ctx.shadowColor = pink;
+    ctx.shadowBlur = 12;
+
+    ctx.beginPath();
+    ctx.arc(x, y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  });
+}
+
+// Floating light streaks around the figure
+function drawFloatingLines() {
+  for (let i = 0; i < 18; i++) {
+    const phase = i * .62 + time * .2;
+
+    const x = 300 + Math.cos(phase) * (180 + i * 4);
+    const y = 330 + Math.sin(phase * .8) * (240 + i * 5);
+
+    bezier([
+      x, y,
+      x + 60, y - 100,
+      x + 120, y + 100,
+      x + 30, y + 190
+    ], i % 4 === 0 ? white : pink,
+    .65, 13, .35);
+  }
+}
+
+// Hair crown
+function drawHairCrown() {
+
+  const paths = [
+    [205,230, 180,120, 250,55, 350,72],
+    [220,200, 230,75, 370,38, 450,125],
+    [200,185, 245,100, 380,70, 450,170],
+    [245,150, 310,75, 440,105, 455,200],
+    [270,120, 355,65, 470,135, 475,230],
+    [195,220, 220,115, 340,80, 410,115],
+    [235,195, 285,110, 420,95, 480,195]
+  ];
+
+  paths.forEach((p, i) => {
+    bezier(p, i % 3 === 0 ? white : pink,
+      i % 2 === 0 ? 1.5 : .8, 20, .85);
+  });
+
+  // Dense flowing strands
+  for (let i = 0; i < 48; i++) {
+    const t = i / 48;
+    const shift = Math.sin(time * .4 + i * .15) * 5;
+
+    bezier([
+      205 + t * 190,
+      180 - t * 110,
+
+      210 + t * 140,
+      65 + shift,
+
+      410 + t * 55,
+      45 + t * 110,
+
+      470 + shift,
+      190 + t * 30
+    ], i % 7 === 0 ? white : pink,
+    i % 6 === 0 ? 1.3 : .55,
+    12, .5);
+  }
+}
+
+// Face silhouette
+function drawFace() {
+
+  // Main illuminated facial contour
+  bezier([
+    260,165,
+    310,125,
+    380,135,
+    415,180,
+
+    445,215,
+    450,245,
+    462,275,
+
+    472,292,
+    458,307,
+    446,314,
+
+    452,328,
+    455,340,
+    445,350,
+
+    435,356,
+    422,350,
+    414,363,
+
+    405,385,
+    384,402,
+    355,397
+  ], white, 2.2, 26);
+
+  // Secondary face contour
+  bezier([
+    270,175,
+    310,145,
+    385,147,
+    423,192,
+
+    447,225,
+    438,270,
+    465,291,
+
+    477,302,
+    449,315,
+    438,319,
+
+    455,338,
+    434,346,
+    417,351
+  ], pink, 1, 18, .8);
+
+  // Forehead light
+  bezier([
+    300,170,
+    350,140,
+    395,160,
+    421,195
+  ], lightPink, 1.2, 20);
+
+  // Nose
+  bezier([
+    421,270,
+    434,283,
+    455,292,
+    466,298,
+
+    465,305,
+    449,308,
+    443,311
+  ], white, 1.3, 20);
+
+  // Lips
+  bezier([
+    440,337,
+    430,333,
+    420,333,
+    414,340,
+
+    425,344,
+    438,343,
+    444,337
+  ], white, 1.3, 18);
+
+  // Lower lip
+  bezier([
+    416,343,
+    425,353,
+    437,352,
+    445,343
+  ], pink, .8, 15);
+
+  // Eye
+  ctx.save();
+
+  const eye = ctx.createRadialGradient(
+    427, 268, 1, 427, 268, 18
+  );
+
+  eye.addColorStop(0, "#fff");
+  eye.addColorStop(.25, "#ffb8e5");
+  eye.addColorStop(1, "rgba(255,40,170,0)");
+
+  ctx.fillStyle = eye;
+  ctx.beginPath();
+  ctx.ellipse(429, 270, 13, 7, -.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+
+  // Ear
+  bezier([
+    268,240,
+    245,215,
+    230,237,
+    242,264,
+
+    249,285,
+    268,279,
+    275,263
+  ], white, 1.5, 17);
+
+  bezier([
+    250,240,
+    265,245,
+    255,260,
+    247,261
+  ], pink, .9, 12);
+
+  // Ear spiral
+  bezier([
+    247,260,
+    232,245,
+    243,225,
+    261,231,
+
+    279,239,
+    268,260,
+    251,265,
+
+    241,270,
+    245,282,
+    256,280
+  ], white, 2, 23);
+}
+
+// Long flowing hair
+function drawLongHair() {
+
+  // Main silhouette strands
+  const strands = 75;
+
+  for (let i = 0; i < strands; i++) {
+    const t = i / strands;
+    const sway = Math.sin(time * .45 + i * .18) * 10;
+
+    bezier([
+      225 + t * 180,
+      180 - t * 35,
+
+      180 + t * 90,
+      350 + sway,
+
+      115 + t * 160,
+      590 + sway,
+
+      155 + t * 180,
+      900
+    ], i % 9 === 0 ? white : pink,
+    i % 7 === 0 ? 1.7 : .65,
+    i % 5 === 0 ? 22 : 11,
+    .4 + random(i) * .5);
+  }
+
+  // Hair waves
+  for (let i = 0; i < 32; i++) {
+    const y = 250 + i * 17;
+    const sway = Math.sin(time * .7 + i) * 12;
+
+    bezier([
+      225 + sway, y,
+      160 + sway, y + 110,
+      135 - sway, y + 240,
+      180 + sway, y + 360
+    ], i % 5 === 0 ? white : lightPink,
+    .8, 14, .55);
+  }
+
+  // Fine strands on the right side
+  for (let i = 0; i < 22; i++) {
+    const x = 385 + i * 3;
+
+    bezier([
+      x, 170,
+      x + 90, 260,
+      x + 15, 430,
+      x + 80, 620
+    ], pink, .7, 13, .45);
+  }
+}
+
+// Neck and shoulders
+function drawBody() {
+
+  // Neck
+  bezier([
+    354,396,
+    345,455,
+    355,493,
+    388,535
+  ], white, 2, 23);
+
+  bezier([
+    420,352,
+    427,420,
+    440,467,
+    470,510
+  ], pink, 1.5, 19);
+
+  // Shoulder
+  bezier([
+    180,610,
+    215,535,
+    300,495,
+    375,510,
+
+    450,515,
+    490,550,
+    520,620
+  ], white, 2, 23);
+
+  // Body contour
+  bezier([
+    180,610,
+    140,700,
+    135,810,
+    165,900
+  ], pink, 1.6, 20);
+
+  bezier([
+    520,620,
+    545,720,
+    530,825,
+    495,900
+  ], white, 1.7, 22);
+
+  // Flowing body filaments
+  for (let i = 0; i < 28; i++) {
+    const offset = i * 8;
+    const wave = Math.sin(time * .5 + i * .3) * 8;
+
+    bezier([
+      175 + offset * .4, 590 + offset,
+
+      250 + wave, 650 + offset,
+
+      400 + wave, 590 + offset,
+
+      510 - offset * .3, 670 + offset
+    ], i % 5 === 0 ? white : pink,
+    .7, 13, .5);
+  }
+
+  // Light crossing the chest
+  bezier([
+    265,650,
+    330,750,
+    400,770,
+    480,830
+  ], white, 1.2, 20, .65);
+}
+
+// Spiral orbit around head
+function drawOrbit() {
+
+  ctx.save();
+  ctx.translate(330, 215);
+
+  for (let i = 0; i < 9; i++) {
+
+    ctx.save();
+
+    ctx.rotate(time * .13 + i * .17);
+
+    ctx.beginPath();
+
+    ctx.ellipse(
+      0, 0,
+      135 + i * 12,
+      42 + i * 5,
+      -.28,
+      0,
+      Math.PI * 2
+    );
+
+    ctx.strokeStyle = i % 3 === 0 ? white : pink;
+    ctx.globalAlpha = .28 + (i % 3) * .13;
+    ctx.lineWidth = i % 3 === 0 ? 1.3 : .65;
+
+    ctx.shadowColor = pink;
+    ctx.shadowBlur = 20;
+
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  ctx.restore();
+
+  // Small bright orbit accents
+  for (let i = 0; i < 4; i++) {
+    const a = time * .45 + i * Math.PI / 2;
+
+    const x = 330 + Math.cos(a) * 180;
+    const y = 215 + Math.sin(a) * 65;
+
+    ctx.save();
+
+    ctx.fillStyle = white;
+    ctx.shadowColor = pink;
+    ctx.shadowBlur = 24;
+
+    ctx.beginPath();
+    ctx.arc(x, y, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+}
+
+// Fine luminous details
+function drawFineDetails() {
+
+  for (let i = 0; i < 24; i++) {
+    const t = i / 24;
+
+    bezier([
+      215 + t * 140, 205,
+      240 + t * 100, 330,
+      160 + t * 160, 460,
+      190 + t * 120, 650
+    ], i % 6 === 0 ? white : pink,
+    .55, 12, .4);
+  }
+
+  // Tiny luminous accents
+  for (let i = 0; i < 12; i++) {
+    const x = 250 + random(i + 200) * 210;
+    const y = 180 + random(i + 400) * 280;
+
+    const pulse = .5 + .5 * Math.sin(time * 2 + i);
+
+    ctx.save();
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = white;
+    ctx.shadowColor = pink;
+    ctx.shadowBlur = 15;
+
+    ctx.beginPath();
+    ctx.arc(x, y, .8 + pulse, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+}
+
+// Main animation
+function animate() {
+
+  time += .012;
+
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+
+  const scale = Math.min(
+    W / DESIGN_W,
+    H / DESIGN_H
+  );
+
+  const offsetX = (W - DESIGN_W * scale) / 2;
+  const offsetY = (H - DESIGN_H * scale) / 2;
+
+  ctx.translate(offsetX, offsetY);
+  ctx.scale(scale, scale);
+
+  background();
+
+  drawParticles();
+  drawFloatingLines();
+
+  drawOrbit();
+  drawHairCrown();
+  drawLongHair();
+
+  drawFace();
+  drawBody();
+
+  drawFineDetails();
+
+  requestAnimationFrame(animate);
+}
+
+animate();
+
+</script>
+</body>
+</html>
